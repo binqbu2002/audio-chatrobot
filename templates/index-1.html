@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Flask Audio Recorder</title>
+  <script src="https://cdn.jsdelivr.net/npm/recordrtc@5.6.1/RecordRTC.min.js"></script>
+</head>
+<body>
+
+<table>
+  <tr>
+    <td>
+      <button id="record">Ask the Robot</button>
+  <button id="stop" disabled>Stop</button>
+  <audio id="audio" controls></audio>
+    </td>
+  </tr>
+
+
+  <tr>
+    <td>
+      <!--<button id="play-music">Get Answer</button> !-->
+<audio id="music" controls style="display: none;"></audio>
+    </td>
+  </tr>
+</table>
+
+
+
+  <script>
+    const recordButton = document.getElementById('record');
+    const stopButton = document.getElementById('stop');
+    const audioElement = document.getElementById('audio');
+
+    let recorder;
+
+recordButton.addEventListener('click', () => {
+  navigator.mediaDevices.getUserMedia({ audio: true })
+    .then(stream => {
+      let silenceStart = null;
+      let audioContext = new AudioContext();
+      let source = audioContext.createMediaStreamSource(stream);
+      let processor = audioContext.createScriptProcessor(2048, 1, 1);
+
+      source.connect(processor);
+      processor.connect(audioContext.destination);
+
+      processor.onaudioprocess = (event) => {
+        let inputBuffer = event.inputBuffer.getChannelData(0);
+        let sum = inputBuffer.reduce((a, b) => a + Math.abs(b), 0);
+        let rms = Math.sqrt(sum / inputBuffer.length);
+
+        if (rms < 0.01 && !silenceStart) {
+          silenceStart = Date.now();
+        } else if (rms >= 0.01 && silenceStart) {
+          silenceStart = null;
+        }
+
+        if (silenceStart && Date.now() - silenceStart >= 2000) {
+          stopButton.click();
+          silenceStart = null;
+        }
+      };
+
+      recorder = RecordRTC(stream, {
+        type: 'audio',
+        mimeType: 'audio/wav',
+        recorderType: StereoAudioRecorder,
+        numberOfAudioChannels: 2,
+        desiredSampRate: 16000,
+      });
+
+      recorder.startRecording();
+      recordButton.disabled = true;
+      stopButton.disabled = false;
+    });
+});
+
+
+
+
+ stopButton.addEventListener('click', () => {
+  recorder.stopRecording(() => {
+    let formData = new FormData();
+    formData.append('audio_data', recorder.getBlob());
+
+    fetch('/upload', {
+      method: 'POST',
+      body: formData
+    }).then(() => {
+      // Add a cache-busting parameter to force the browser to load the new audio file
+      const timestamp = new Date().getTime();
+      audioElement.src = `/audio/audio.wav?${timestamp}`;
+      audioElement.load();
+      audioElement.play().then(() => {
+        // Add a listener for the 'ended' event on the audioElement
+        audioElement.addEventListener('ended', () => {
+          // Replace 'path/to/music/file.mp3' with the actual path to your music file
+          musicElement.src = '/fetch_music';
+          musicElement.load();
+          musicElement.play();
+          // Show the musicElement
+          musicElement.style.display = 'block';
+        });
+      });
+      recordButton.disabled = false;
+      stopButton.disabled = true;
+
+      // Release the previous media stream
+      recorder.stream.stop();
+    });
+  });
+});
+
+
+
+<!-- Add this inside the <script> tag -->
+const playMusicButton = document.getElementById('play-music');
+const musicElement = document.getElementById('music');
+
+// Add an event listener for the 'ended' event
+musicElement.addEventListener('ended', () => {
+  // Refresh the page when playback has ended
+  window.location.reload();
+});
+
+  </script>
+
+</body>
+</html>
