@@ -11,8 +11,20 @@ def index():
 
 @app.route('/upload', methods=['POST'])
 def upload():
+    # audio_data = request.files['audio_data']
+    # audio_data.save('audio.wav')
+
     audio_data = request.files['audio_data']
-    audio_data.save('audio.wav')
+    audio_path = os.path.join('./', 'audio.wav')
+    audio_data.save(audio_path)
+
+    # Convert audio to WAV format with a sample rate of 16000 Hz
+    audio = AudioSegment.from_file(audio_path)
+    audio = audio.set_frame_rate(16000)
+    audio.export('audio.wav', format='wav')
+
+    # return 'OK'
+
     return 'OK'
 
 
@@ -51,9 +63,12 @@ def fetch_music():
     os.system('rm -rf ./audio.wav')
     os.system('curl -OJ http://18.132.153.117:5000/download/audio.wav')
 
+    # music_file_path = './audio.wav'
+    # output_path = './audio.wav'
+    #
     music_file_path = './audio.wav'
     output_path = './audio.wav'
-
+    #
     # Convert the audio file to 16kHz
     audio = AudioSegment.from_file(music_file_path)
     converted_audio = audio.set_frame_rate(16000)

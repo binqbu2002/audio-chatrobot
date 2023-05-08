@@ -1,142 +1,139 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Flask Audio Recorder</title>
-  <script src="https://cdn.jsdelivr.net/npm/recordrtc@5.6.1/RecordRTC.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Recorder</title>
 </head>
 <body>
+    <button id="record">Record</button>
+    <button id="stop" disabled>Stop</button>
+    <button id="stop-all">Stop All</button>
+    <audio id="audio" controls style="display: none;"></audio>
+    <audio id="music" controls style="display: none;"></audio>
+    <script>
+         const recordButton = document.getElementById('record');
+        const stopButton = document.getElementById('stop');
+        const stopAllButton = document.getElementById('stop-all');
+        const audioElement = document.getElementById('audio');
+        const musicElement = document.getElementById('music');
 
-<table>
-  <tr>
-    <td>
-      <button id="record">Ask the Robot</button>
-  <button id="stop" disabled>Stop</button>
-  <audio id="audio" controls></audio>
-    </td>
-  </tr>
+        let mediaRecorder;
+        let chunks = [];
+        let silenceDetector;
+        let allowLoop = true;
 
+        const startRecording = () => {
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    const audioContext = new AudioContext();
+                    const source = audioContext.createMediaStreamSource(stream);
+                    silenceDetector = audioContext.createScriptProcessor(4096, 1, 1);
 
-  <tr>
-    <td>
-      <!--<button id="play-music">Get Answer</button> !-->
-<audio id="music" controls style="display: none;"></audio>
-    </td>
-  </tr>
-</table>
+                    let silenceDuration = 0;
+                    let previousTimestamp = new Date().getTime();
+                    let recordingStarted = false;
 
+                    silenceDetector.onaudioprocess = (e) => {
+                        const buffer = e.inputBuffer.getChannelData(0);
+                        let maxAmplitude = 0;
 
+                        for (let i = 0; i < buffer.length; i++) {
+                            maxAmplitude = Math.max(maxAmplitude, Math.abs(buffer[i]));
+                        }
 
-  <script>
-    const recordButton = document.getElementById('record');
-    const stopButton = document.getElementById('stop');
-    const audioElement = document.getElementById('audio');
+                        const silenceThreshold = 0.01;
+                        const isSilent = maxAmplitude < silenceThreshold;
 
-    let recorder;
+                        if (!recordingStarted && !isSilent) {
+                            recordingStarted = true;
+                        }
 
-let silenceDuration = 0;
-let previousTimestamp = 0;
+                        if (recordingStarted) {
+                            const currentTimestamp = new Date().getTime();
+                            silenceDuration = isSilent ? (silenceDuration + (currentTimestamp - previousTimestamp)) : 0;
+                            previousTimestamp = currentTimestamp;
 
-recordButton.addEventListener('click', () => {
-  navigator.mediaDevices.getUserMedia({ audio: true })
-    .then(stream => {
-      recorder = RecordRTC(stream, {
-        type: 'audio',
-        mimeType: 'audio/wav',
-        recorderType: StereoAudioRecorder, // Use StereoAudioRecorder
-        numberOfAudioChannels: 2, // Set to stereo (2 channels)
-        desiredSampRate: 16000, // Set sample rate to 16000 Hz
-        timeSlice: 100, // Check for silence every 100 milliseconds
-        ondataavailable: function (blob) {
-          // Calculate the audio level (amplitude) in the current blob
-          const audioContext = new AudioContext();
-          const reader = new FileReader();
-          reader.onload = function (event) {
-            audioContext.decodeAudioData(event.target.result, function (buffer) {
-              let maxAmplitude = 0;
-              for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
-                const data = buffer.getChannelData(channel);
-                for (let i = 0; i < data.length; i++) {
-                  maxAmplitude = Math.max(maxAmplitude, Math.abs(data[i]));
-                }
-              }
+                            if (silenceDuration >= 2000) {
+                                stopButton.click();
+                            }
+                        }
+                    };
 
-              // Consider the audio as silent if the maximum amplitude is below a certain threshold
-              const silenceThreshold = 0.01;
-              const isSilent = maxAmplitude < silenceThreshold;
+                    source.connect(silenceDetector);
+                    silenceDetector.connect(audioContext.destination);
 
-              // Update the silence duration and check if it's longer than 2 seconds
-              const currentTimestamp = new Date().getTime();
-              silenceDuration += isSilent ? (currentTimestamp - previousTimestamp) : 0;
-              previousTimestamp = currentTimestamp;
+                    mediaRecorder = new MediaRecorder(stream);
+                    mediaRecorder.start();
 
-              if (silenceDuration >= 2000) {
-                // Stop the recording and trigger the stopButton event
-                stopButton.dispatchEvent(new Event('click'));
-              }
-            });
-          };
-          reader.readAsArrayBuffer(blob);
-        },
-      });
-      recorder.startRecording();
-      recordButton.disabled = true;
-      stopButton.disabled = false;
-      silenceDuration = 0; // Reset the silence duration
-      previousTimestamp = new Date().getTime(); // Initialize the previous timestamp
-    });
-});
+                    mediaRecorder.ondataavailable = e => {
+                        chunks.push(e.data);
+                    };
 
+                    mediaRecorder.onstop = () => {
+                        const blob = new Blob(chunks, { type: 'audio/wav' });
+                        chunks = [];
+                        let formData = new FormData();
+                        formData.append('audio_data', blob);
 
+                        fetch('/upload', {
+                            method: 'POST',
+                            body: formData
+                        }).then(() => {
+                            const timestamp = new Date().getTime();
+                            audioElement.src = `/audio/audio.wav?${timestamp}`;
+                            audioElement.load();
+                            audioElement.play();
+                            recordButton.disabled = false;
+                            stopButton.disabled = true;
+                        });
+                    };
 
+                    recordButton.disabled = true;
+                    stopButton.disabled = false;
+                });
+        };
 
-
- stopButton.addEventListener('click', () => {
-  recorder.stopRecording(() => {
-    let formData = new FormData();
-    formData.append('audio_data', recorder.getBlob());
-
-    fetch('/upload', {
-      method: 'POST',
-      body: formData
-    }).then(() => {
-      // Add a cache-busting parameter to force the browser to load the new audio file
-      const timestamp = new Date().getTime();
-      audioElement.src = `/audio/audio.wav?${timestamp}`;
-      audioElement.load();
-      audioElement.play().then(() => {
-        // Add a listener for the 'ended' event on the audioElement
-        audioElement.addEventListener('ended', () => {
-          // Replace 'path/to/music/file.mp3' with the actual path to your music file
-          musicElement.src = '/fetch_music';
-          musicElement.load();
-          musicElement.play();
-          // Show the musicElement
-          musicElement.style.display = 'block';
+       recordButton.addEventListener('click', startRecording);
+        stopButton.addEventListener('click', () => {
+            mediaRecorder.stop();
+            silenceDetector.disconnect();
         });
-      });
-      recordButton.disabled = false;
-      stopButton.disabled = true;
 
-      // Release the previous media stream
-      recorder.stream.stop();
-    });
-  });
-});
+                stopAllButton.addEventListener('click', () => {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                silenceDetector.disconnect();
+            }
+            if (!audioElement.paused) {
+                audioElement.pause();
+            }
+            if (!musicElement.paused) {
+                musicElement.pause();
+            }
+            allowLoop = false;
+        });
+
+        audioElement.addEventListener('ended', () => {
+            if (allowLoop) {
+                fetch('/fetch_music')
+                    .then(response => response.blob())
+                    .then(blob => {
+                        musicElement.src = URL.createObjectURL(blob);
+                        musicElement.load();
+                        musicElement.play();
+                        musicElement.style.display = 'block';
+                    });
+            }
+        });
+
+        musicElement.addEventListener('ended', () => {
+            if (allowLoop) {
+                startRecording();
+            }
+        });
 
 
-
-<!-- Add this inside the <script> tag -->
-const playMusicButton = document.getElementById('play-music');
-const musicElement = document.getElementById('music');
-
-// Add an event listener for the 'ended' event
-musicElement.addEventListener('ended', () => {
-  // Refresh the page when playback has ended
-  window.location.reload();
-});
-recordButton.click(); // Start recording automatically when the page is refreshed
-
-  </script>
-
+    </script>
 </body>
 </html>
