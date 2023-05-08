@@ -50,10 +50,10 @@ def upload():
 #     return ('', 204)
 
 
-
-@app.route('/audio/<path:filename>', methods=['GET', 'POST'])
-def download(filename):
-    return send_from_directory(directory='.', path=filename)
+#
+@app.route('/audio/audio.wav', methods=['GET', 'POST'])
+def download():
+    return send_from_directory(directory='.', path='audio.wav')
 
 @app.route('/fetch_music', methods=['GET'])
 def fetch_music():

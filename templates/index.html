@@ -12,7 +12,7 @@
     <audio id="audio" controls style="display: none;"></audio>
     <audio id="music" controls style="display: none;"></audio>
     <script>
-         const recordButton = document.getElementById('record');
+        const recordButton = document.getElementById('record');
         const stopButton = document.getElementById('stop');
         const stopAllButton = document.getElementById('stop-all');
         const audioElement = document.getElementById('audio');
@@ -32,7 +32,6 @@
 
                     let silenceDuration = 0;
                     let previousTimestamp = new Date().getTime();
-                    let recordingStarted = false;
 
                     silenceDetector.onaudioprocess = (e) => {
                         const buffer = e.inputBuffer.getChannelData(0);
@@ -45,18 +44,12 @@
                         const silenceThreshold = 0.01;
                         const isSilent = maxAmplitude < silenceThreshold;
 
-                        if (!recordingStarted && !isSilent) {
-                            recordingStarted = true;
-                        }
+                        const currentTimestamp = new Date().getTime();
+                        silenceDuration = isSilent ? (silenceDuration + (currentTimestamp - previousTimestamp)) : 0;
+                        previousTimestamp = currentTimestamp;
 
-                        if (recordingStarted) {
-                            const currentTimestamp = new Date().getTime();
-                            silenceDuration = isSilent ? (silenceDuration + (currentTimestamp - previousTimestamp)) : 0;
-                            previousTimestamp = currentTimestamp;
-
-                            if (silenceDuration >= 2000) {
-                                stopButton.click();
-                            }
+                        if (silenceDuration >= 2000) {
+                            stopButton.click();
                         }
                     };
 
