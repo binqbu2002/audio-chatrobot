@@ -8,6 +8,7 @@
 <body>
     <button id="recordButton">Start Recording</button>
 
+    <button id="Stop All" onclick="document.location.reload()">Stop All</button>
     <div id = "question" style="display: none"> Replay your question
         <audio id="audioPlayer" controls></audio>
     </div>
@@ -48,7 +49,7 @@
                             isRecording = false;
                             recordButton.textContent = 'Start Recording';
                         }
-                    }, 3000);  // 3 seconds of silence
+                    }, 2000);  // 2 seconds of silence
                 });
 
                 speechEvents.on('speaking', function() {
@@ -93,8 +94,9 @@
             }).then(response => {
                 return response.json();
             }).then(data => {
+                const timestamp = new Date().getTime();
                 question.style.display = 'none';
-                musicPlayer.src = data.url;
+                musicPlayer.src = `/audio.wav?${timestamp}`;
                 musicPlayer.play();
                 answer.style.display = 'block';
             });
@@ -102,8 +104,9 @@
 
         // Refresh the page after the music has finished playing
         musicPlayer.onended = function() {
-            location.reload();
-            // answer.style.display = 'none';
+            //location.reload();
+            answer.style.display = 'none';
+            recordButton.click();
             // startRecording();
         }
 
@@ -133,29 +136,3 @@
 
 </body>
 </html>
-
-
-<!--
-    let lastTimeUpdate = 0;
-    let stuckTimeout = null;
-    const STUCK_TIMEOUT_MS = 2000;
-            // Stop playing if the music is stuck or blocked
-        musicPlayer.ontimeupdate = function() {
-            if (musicPlayer.currentTime === lastTimeUpdate) {
-                if (!stuckTimeout) {
-                    stuckTimeout = setTimeout(function() {
-                        musicPlayer.pause();
-                        location.reload();
-                        stuckTimeout = null;
-                    }, STUCK_TIMEOUT_MS);
-                }
-            } else {
-                clearTimeout(stuckTimeout);
-                stuckTimeout = null;
-            }
-
-            lastTimeUpdate = musicPlayer.currentTime;
-        }
-
-!-->
-

@@ -8,8 +8,16 @@ app = Flask(__name__)
 def index():
     return render_template('index.html')
 
-@app.route('/audio.wav')
+
+
+@app.route('/audio.wav', methods=['GET', 'POST'])
 def serve_audio():
+    return send_from_directory(directory='.', path='audio.wav')
+
+@app.route('/music_play', methods=['GET'])
+def music_play():
+    # ... your code here to select the music file ...
+    # return the URL of the music file
     print("ask GPT")
     os.system('curl -X POST -F \"file=@audio.wav\" http://18.132.153.117:5000/upload')
     os.system('rm -rf ./audio.wav')
@@ -25,19 +33,12 @@ def serve_audio():
     audio = AudioSegment.from_file(music_file_path)
     converted_audio = audio.set_frame_rate(16000)
     converted_audio.export(output_path, format='wav')
-
-
-    return send_from_directory(directory='.', path='audio.wav')
-
-@app.route('/music_play', methods=['GET'])
-def music_play():
-    # ... your code here to select the music file ...
-    # return the URL of the music file
     url = "./audio.wav"
     return jsonify({'url': url})
 
 @app.route('/record', methods=['POST'])
 def record():
+    os.system('rm -rf ./audio.wav')
     audio_file = request.files['audio_data']
     file_path = 'recorded_audio.webm'
     audio_file.save(file_path)
@@ -64,4 +65,4 @@ def record():
     return send_file(wav_file_path, as_attachment=True)
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0',debug=True)
+    app.run(host='0.0.0.0',port = 8200, debug=True)
