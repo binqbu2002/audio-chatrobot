@@ -1,7 +1,6 @@
-from flask import Flask, render_template, request, send_from_directory, url_for
+from flask import Flask, render_template, jsonify, request, send_file, send_from_directory
+from pydub import AudioSegment
 import os
-import time
-from pydub import AudioSegment, silence
 
 app = Flask(__name__)
 
@@ -9,55 +8,8 @@ app = Flask(__name__)
 def index():
     return render_template('index.html')
 
-@app.route('/upload', methods=['POST'])
-def upload():
-    # audio_data = request.files['audio_data']
-    # audio_data.save('audio.wav')
-
-    audio_data = request.files['audio_data']
-    audio_path = os.path.join('./', 'audio.wav')
-    audio_data.save(audio_path)
-
-    # Convert audio to WAV format with a sample rate of 16000 Hz
-    audio = AudioSegment.from_file(audio_path)
-    audio = audio.set_frame_rate(16000)
-    audio.export('audio.wav', format='wav')
-
-    # return 'OK'
-
-    return 'OK'
-
-
-
-# @app.route('/upload', methods=['POST'])
-# def upload():
-#     audio_data = request.files['audio_data']
-#     audio_path = os.path.join('.', 'audio.wav')
-#     audio_data.save(audio_path)
-#
-#     # Load the audio file
-#     audio = AudioSegment.from_wav(audio_path)
-#
-#     # Detect silence and split the audio
-#     silent_ranges = silence.detect_silence(audio, min_silence_len=2000, silence_thresh=-40)
-#     silent_ranges = [(start, end) for start, end in silent_ranges if end - start > 2000]
-#
-#     if silent_ranges:
-#         start, end = silent_ranges[0]
-#         split_audio = audio[:start]
-#         split_audio.export(audio_path, format='wav')
-#
-#     return ('', 204)
-
-
-#
-@app.route('/audio/audio.wav', methods=['GET', 'POST'])
-def download():
-    return send_from_directory(directory='.', path='audio.wav')
-
-@app.route('/fetch_music', methods=['GET'])
-def fetch_music():
-    # Replace 'path/to/music/file.mp3' with the actual path to your music file
+@app.route('/audio.wav')
+def serve_audio():
     print("ask GPT")
     os.system('curl -X POST -F \"file=@audio.wav\" http://18.132.153.117:5000/upload')
     os.system('rm -rf ./audio.wav')
@@ -74,8 +26,42 @@ def fetch_music():
     converted_audio = audio.set_frame_rate(16000)
     converted_audio.export(output_path, format='wav')
 
+
     return send_from_directory(directory='.', path='audio.wav')
 
+@app.route('/music_play', methods=['GET'])
+def music_play():
+    # ... your code here to select the music file ...
+    # return the URL of the music file
+    url = "./audio.wav"
+    return jsonify({'url': url})
+
+@app.route('/record', methods=['POST'])
+def record():
+    audio_file = request.files['audio_data']
+    file_path = 'recorded_audio.webm'
+    audio_file.save(file_path)
+
+    # Convert the webm file to a wav file using pydub
+    webm_audio = AudioSegment.from_file(file_path, format='webm')
+    wav_file_path = 'audio.wav'
+    webm_audio = webm_audio.set_frame_rate(16000)
+    webm_audio.export(wav_file_path, format='wav')
+
+    # Clean up temporary files
+    os.remove(file_path)
+
+    # audio_data = request.files['audio_data']
+    # audio_path = os.path.join('./', 'audio.wav')
+    # audio_data.save(audio_path)
+    #
+    # # Convert audio to WAV format with a sample rate of 16000 Hz
+    # audio = AudioSegment.from_file(audio_path)
+    # audio = audio.set_frame_rate(16000)
+    # audio.export('audio.wav', format='wav')
+    #
+
+    return send_file(wav_file_path, as_attachment=True)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0',debug=True)

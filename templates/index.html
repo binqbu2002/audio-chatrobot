@@ -3,130 +3,90 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Audio Recorder</title>
+    <title>Online Voice Recorder</title>
 </head>
 <body>
-    <button id="record">Record</button>
-    <button id="stop" disabled>Stop</button>
-    <button id="stop-all">Stop All</button>
-    <audio id="audio" controls style="display: none;"></audio>
-    <audio id="music" controls style="display: none;"></audio>
+    <button id="recordButton">Start Recording</button>
+
+    <div id = "question" style="display: none"> Replay your question
+        <audio id="audioPlayer" controls></audio>
+    </div>
+
+    <div id = "answer" style="display: none"> Answer from GPT
+        <audio id="musicPlayer" controls></audio>
+    </div>
+<!--    <audio id="audioPlayer" controls style="display: none;">Replay your question</audio>-->
+<!--    <audio id="musicPlayer" controls style="display: none;">GPT respond</audio>-->
+
+<!--        <audio id="audio" controls style="display: none;"></audio>-->
+<!--    <audio id="music" controls style="display: none;"></audio>-->
+
     <script>
-        const recordButton = document.getElementById('record');
-        const stopButton = document.getElementById('stop');
-        const stopAllButton = document.getElementById('stop-all');
-        const audioElement = document.getElementById('audio');
-        const musicElement = document.getElementById('music');
-
+        let recordButton = document.getElementById('recordButton');
+        let audioPlayer = document.getElementById('audioPlayer');
+        let musicPlayer = document.getElementById('musicPlayer');
+        let question = document.getElementById('question');
+        let answer = document.getElementById('answer');
         let mediaRecorder;
-        let chunks = [];
-        let silenceDetector;
-        let allowLoop = true;
+        let recordedChunks = [];
 
-        const startRecording = () => {
-            navigator.mediaDevices.getUserMedia({ audio: true })
-                .then(stream => {
-                    const audioContext = new AudioContext();
-                    const source = audioContext.createMediaStreamSource(stream);
-                    silenceDetector = audioContext.createScriptProcessor(4096, 1, 1);
-
-                    let silenceDuration = 0;
-                    let previousTimestamp = new Date().getTime();
-
-                    silenceDetector.onaudioprocess = (e) => {
-                        const buffer = e.inputBuffer.getChannelData(0);
-                        let maxAmplitude = 0;
-
-                        for (let i = 0; i < buffer.length; i++) {
-                            maxAmplitude = Math.max(maxAmplitude, Math.abs(buffer[i]));
-                        }
-
-                        const silenceThreshold = 0.01;
-                        const isSilent = maxAmplitude < silenceThreshold;
-
-                        const currentTimestamp = new Date().getTime();
-                        silenceDuration = isSilent ? (silenceDuration + (currentTimestamp - previousTimestamp)) : 0;
-                        previousTimestamp = currentTimestamp;
-
-                        if (silenceDuration >= 2000) {
-                            stopButton.click();
-                        }
-                    };
-
-                    source.connect(silenceDetector);
-                    silenceDetector.connect(audioContext.destination);
-
+        recordButton.onclick = function() {
+            if (recordButton.textContent === 'Start Recording') {
+                navigator.mediaDevices.getUserMedia({audio: true}).then(stream => {
                     mediaRecorder = new MediaRecorder(stream);
                     mediaRecorder.start();
 
-                    mediaRecorder.ondataavailable = e => {
-                        chunks.push(e.data);
+                    mediaRecorder.ondataavailable = function(e) {
+                        recordedChunks.push(e.data);
                     };
 
-                    mediaRecorder.onstop = () => {
-                        const blob = new Blob(chunks, { type: 'audio/wav' });
-                        chunks = [];
+                    mediaRecorder.onstop = function() {
                         let formData = new FormData();
+                        let blob = new Blob(recordedChunks, {type: 'audio/webm'});
                         formData.append('audio_data', blob);
-
-                        fetch('/upload', {
+                        fetch('/record', {
                             method: 'POST',
                             body: formData
-                        }).then(() => {
-                            const timestamp = new Date().getTime();
-                            audioElement.src = `/audio/audio.wav?${timestamp}`;
-                            audioElement.load();
-                            audioElement.play();
-                            recordButton.disabled = false;
-                            stopButton.disabled = true;
+                        }).then(response => {
+                            return response.blob();
+                        }).then(blob => {
+                            let url = URL.createObjectURL(blob);
+                            // let a = document.createElement('a');
+                            // a.href = url;
+                            // a.download = 'recorded_audio.wav';
+                            // a.click();
+                            audioPlayer.src = url;
+                            audioPlayer.play();
+                            question.style.display = 'block';
                         });
+                        recordedChunks = [];
                     };
-
-                    recordButton.disabled = true;
-                    stopButton.disabled = false;
                 });
-        };
-
-       recordButton.addEventListener('click', startRecording);
-        stopButton.addEventListener('click', () => {
-            mediaRecorder.stop();
-            silenceDetector.disconnect();
-        });
-
-                stopAllButton.addEventListener('click', () => {
-            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                recordButton.textContent = 'Stop Recording';
+            } else {
                 mediaRecorder.stop();
-                silenceDetector.disconnect();
+                recordButton.textContent = 'Start Recording';
             }
-            if (!audioElement.paused) {
-                audioElement.pause();
-            }
-            if (!musicElement.paused) {
-                musicElement.pause();
-            }
-            allowLoop = false;
-        });
+        }
 
-        audioElement.addEventListener('ended', () => {
-            if (allowLoop) {
-                fetch('/fetch_music')
-                    .then(response => response.blob())
-                    .then(blob => {
-                        musicElement.src = URL.createObjectURL(blob);
-                        musicElement.load();
-                        musicElement.play();
-                        musicElement.style.display = 'block';
-                    });
-            }
-        });
+        // Play music after recorded audio has finished playing
+        audioPlayer.onended = function() {
+            fetch('/music_play', {
+                method: 'GET'
+            }).then(response => {
+                return response.json();
+            }).then(data => {
+                question.style.display = 'none';
+                musicPlayer.src = data.url;
+                musicPlayer.play();
+                answer.style.display = 'block';
+            });
+        }
 
-        musicElement.addEventListener('ended', () => {
-            if (allowLoop) {
-                startRecording();
-            }
-        });
-
-
+        // Refresh the page after the music has finished playing
+        musicPlayer.onended = function() {
+            location.reload();
+        }
     </script>
 </body>
 </html>
