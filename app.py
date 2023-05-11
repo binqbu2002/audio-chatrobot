@@ -27,7 +27,7 @@ def serve_audio():
     converted_audio.export(output_path, format='wav')
 
 
-    return send_from_directory(directory='.', path='audio.wav')
+    return send_from_directory(directory='.', path='audio.wav', filename='audio.wav')
 
 @app.route('/music_play', methods=['GET'])
 def music_play():
