@@ -87,6 +87,11 @@
         musicPlayer.onended = function() {
             location.reload();
         }
+
+                // Refresh the page if an error occurs while playing the music
+        musicPlayer.onerror = function() {
+            location.reload();
+        }
     </script>
 </body>
 </html>
