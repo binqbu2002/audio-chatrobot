@@ -15,61 +15,78 @@
     <div id = "answer" style="display: none"> Answer from GPT
         <audio id="musicPlayer" controls></audio>
     </div>
-<!--    <audio id="audioPlayer" controls style="display: none;">Replay your question</audio>-->
-<!--    <audio id="musicPlayer" controls style="display: none;">GPT respond</audio>-->
 
-<!--        <audio id="audio" controls style="display: none;"></audio>-->
-<!--    <audio id="music" controls style="display: none;"></audio>-->
+<script src="https://cdn.jsdelivr.net/gh/otalk/hark@latest/hark.bundle.js"></script>
+<script>
+    let recordButton = document.getElementById('recordButton');
+    let audioPlayer = document.getElementById('audioPlayer');
+    let musicPlayer = document.getElementById('musicPlayer');
+    let question = document.getElementById('question');
+    let answer = document.getElementById('answer');
+    let mediaRecorder;
+    let recordedChunks = [];
+    let isRecording = false;
+    let lastTimeUpdate = 0;
+    let stuckTimeout = null;
+    const STUCK_TIMEOUT_MS = 2000;
 
-    <script>
-        let recordButton = document.getElementById('recordButton');
-        let audioPlayer = document.getElementById('audioPlayer');
-        let musicPlayer = document.getElementById('musicPlayer');
-        let question = document.getElementById('question');
-        let answer = document.getElementById('answer');
-        let mediaRecorder;
-        let recordedChunks = [];
+    recordButton.onclick = function() {
+        if (!isRecording) {
+            navigator.mediaDevices.getUserMedia({audio: true}).then(stream => {
+                mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder.start();
 
-        recordButton.onclick = function() {
-            if (recordButton.textContent === 'Start Recording') {
-                navigator.mediaDevices.getUserMedia({audio: true}).then(stream => {
-                    mediaRecorder = new MediaRecorder(stream);
-                    mediaRecorder.start();
+                // hark setup
+                let options = {};
+                let speechEvents = hark(stream, options);
 
-                    mediaRecorder.ondataavailable = function(e) {
-                        recordedChunks.push(e.data);
-                    };
-
-                    mediaRecorder.onstop = function() {
-                        let formData = new FormData();
-                        let blob = new Blob(recordedChunks, {type: 'audio/webm'});
-                        formData.append('audio_data', blob);
-                        fetch('/record', {
-                            method: 'POST',
-                            body: formData
-                        }).then(response => {
-                            return response.blob();
-                        }).then(blob => {
-                            let url = URL.createObjectURL(blob);
-                            // let a = document.createElement('a');
-                            // a.href = url;
-                            // a.download = 'recorded_audio.wav';
-                            // a.click();
-                            audioPlayer.src = url;
-                            audioPlayer.play();
-                            question.style.display = 'block';
-                        });
-                        recordedChunks = [];
-                    };
+                let timeout;
+                speechEvents.on('stopped_speaking', function() {
+                    timeout = setTimeout(function() {
+                        if (mediaRecorder.state === 'recording') {
+                            mediaRecorder.stop();
+                            isRecording = false;
+                            recordButton.textContent = 'Start Recording';
+                        }
+                    }, 3000);  // 3 seconds of silence
                 });
-                recordButton.textContent = 'Stop Recording';
-            } else {
-                mediaRecorder.stop();
-                recordButton.textContent = 'Start Recording';
-            }
-        }
 
-        // Play music after recorded audio has finished playing
+                speechEvents.on('speaking', function() {
+                    clearTimeout(timeout);
+                });
+
+                mediaRecorder.ondataavailable = function(e) {
+                    recordedChunks.push(e.data);
+                };
+
+                mediaRecorder.onstop = function() {
+                    let formData = new FormData();
+                    let blob = new Blob(recordedChunks, {type: 'audio/webm'});
+                    formData.append('audio_data', blob);
+                    fetch('/record', {
+                        method: 'POST',
+                        body: formData
+                    }).then(response => {
+                        return response.blob();
+                    }).then(blob => {
+                        let url = URL.createObjectURL(blob);
+                        audioPlayer.src = url;
+                        audioPlayer.play();
+                        question.style.display = 'block';
+                    });
+                    recordedChunks = [];
+                };
+            });
+            recordButton.textContent = 'Stop Recording';
+            isRecording = true;
+        } else {
+            mediaRecorder.stop();
+            recordButton.textContent = 'Start Recording';
+            isRecording = false;
+        }
+    }
+
+            // Play music after recorded audio has finished playing
         audioPlayer.onended = function() {
             fetch('/music_play', {
                 method: 'GET'
@@ -78,20 +95,52 @@
             }).then(data => {
                 question.style.display = 'none';
                 musicPlayer.src = data.url;
+                // musicPlayer.load();
                 musicPlayer.play();
                 answer.style.display = 'block';
             });
+
+            // fetch('/music_play')
+            //         .then(response => response.blob())
+            //         .then(blob => {
+            //             question.style.display = 'none';
+            //             musicPlayer.src = URL.createObjectURL(blob);
+            //             musicPlayer.load();
+            //             musicPlayer.play();
+            //             answer.style.display = 'block';
+            //         });
         }
 
         // Refresh the page after the music has finished playing
-        musicPlayer.onended = function() {
-            location.reload();
-        }
-
+    // Refresh the page after the music has finished playing
+    musicPlayer.onended = function() {
+        // location.reload(); // remove this line
+        answer.style.display = 'none';
+        recordButton.click(); // this will start the recording process again
+    }
                 // Refresh the page if an error occurs while playing the music
         musicPlayer.onerror = function() {
             location.reload();
         }
-    </script>
+            // Stop playing if the music is stuck or blocked
+        musicPlayer.ontimeupdate = function() {
+            if (musicPlayer.currentTime === lastTimeUpdate) {
+                if (!stuckTimeout) {
+                    stuckTimeout = setTimeout(function() {
+                        musicPlayer.pause();
+                        location.reload();
+                        stuckTimeout = null;
+                    }, STUCK_TIMEOUT_MS);
+                }
+            } else {
+                clearTimeout(stuckTimeout);
+                stuckTimeout = null;
+            }
+
+            lastTimeUpdate = musicPlayer.currentTime;
+        }
+
+</script>
+
 </body>
 </html>
