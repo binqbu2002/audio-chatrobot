@@ -95,29 +95,18 @@
             }).then(data => {
                 question.style.display = 'none';
                 musicPlayer.src = data.url;
-                // musicPlayer.load();
                 musicPlayer.play();
                 answer.style.display = 'block';
             });
-
-            // fetch('/music_play')
-            //         .then(response => response.blob())
-            //         .then(blob => {
-            //             question.style.display = 'none';
-            //             musicPlayer.src = URL.createObjectURL(blob);
-            //             musicPlayer.load();
-            //             musicPlayer.play();
-            //             answer.style.display = 'block';
-            //         });
         }
 
         // Refresh the page after the music has finished playing
-    // Refresh the page after the music has finished playing
-    musicPlayer.onended = function() {
-        // location.reload(); // remove this line
-        answer.style.display = 'none';
-        recordButton.click(); // this will start the recording process again
-    }
+        musicPlayer.onended = function() {
+            location.reload();
+            // answer.style.display = 'none';
+            // startRecording();
+        }
+
                 // Refresh the page if an error occurs while playing the music
         musicPlayer.onerror = function() {
             location.reload();
