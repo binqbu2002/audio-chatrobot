@@ -31,61 +31,69 @@
     let stuckTimeout = null;
     const STUCK_TIMEOUT_MS = 2000;
 
-    recordButton.onclick = function() {
-        if (!isRecording) {
-            navigator.mediaDevices.getUserMedia({audio: true}).then(stream => {
-                mediaRecorder = new MediaRecorder(stream);
-                mediaRecorder.start();
+recordButton.onclick = function() {
+    if (!isRecording) {
+        navigator.mediaDevices.getUserMedia({audio: true}).then(stream => {
+            mediaRecorder = new MediaRecorder(stream);
 
-                // hark setup
-                let options = {};
-                let speechEvents = hark(stream, options);
+            // hark setup
+            let options = {};
+            let speechEvents = hark(stream, options);
+            let hasStartedSpeaking = false;
 
-                let timeout;
-                speechEvents.on('stopped_speaking', function() {
-                    timeout = setTimeout(function() {
-                        if (mediaRecorder.state === 'recording') {
-                            mediaRecorder.stop();
-                            isRecording = false;
-                            recordButton.textContent = 'Start Recording';
-                        }
-                    }, 2000);  // 2 seconds of silence
-                });
-
-                speechEvents.on('speaking', function() {
-                    clearTimeout(timeout);
-                });
-
-                mediaRecorder.ondataavailable = function(e) {
-                    recordedChunks.push(e.data);
-                };
-
-                mediaRecorder.onstop = function() {
-                    let formData = new FormData();
-                    let blob = new Blob(recordedChunks, {type: 'audio/webm'});
-                    formData.append('audio_data', blob);
-                    fetch('/record', {
-                        method: 'POST',
-                        body: formData
-                    }).then(response => {
-                        return response.blob();
-                    }).then(blob => {
-                        let url = URL.createObjectURL(blob);
-                        audioPlayer.src = url;
-                        audioPlayer.play();
-                        question.style.display = 'block';
-                    });
-                    recordedChunks = [];
-                };
+            let timeout;
+            speechEvents.on('stopped_speaking', function() {
+                timeout = setTimeout(function() {
+                    if (mediaRecorder.state === 'recording') {
+                        mediaRecorder.stop();
+                        isRecording = false;
+                        recordButton.textContent = 'Start Recording';
+                    }
+                }, 2000);  // 2 seconds of silence
             });
-            recordButton.textContent = 'Stop Recording';
-            isRecording = true;
-        } else {
+
+            speechEvents.on('speaking', function() {
+                clearTimeout(timeout);
+                if (!hasStartedSpeaking) {
+                    mediaRecorder.start();
+                    hasStartedSpeaking = true;
+                    recordButton.textContent = 'Stop Recording';
+                    isRecording = true;
+                }
+            });
+
+            mediaRecorder.ondataavailable = function(e) {
+                recordedChunks.push(e.data);
+            };
+
+            mediaRecorder.onstop = function() {
+                let formData = new FormData();
+                let blob = new Blob(recordedChunks, {type: 'audio/webm'});
+                formData.append('audio_data', blob);
+                fetch('/record', {
+                    method: 'POST',
+                    body: formData
+                }).then(response => {
+                    return response.blob();
+                }).then(blob => {
+                    let url = URL.createObjectURL(blob);
+                    audioPlayer.src = url;
+                    audioPlayer.play();
+                    question.style.display = 'block';
+                });
+                recordedChunks = [];
+            };
+        });
+    } else {
+        if (mediaRecorder.state === 'recording') {
             mediaRecorder.stop();
             recordButton.textContent = 'Start Recording';
             isRecording = false;
         }
     }
+}
+
+
 
             // Play music after recorded audio has finished playing
         audioPlayer.onended = function() {
