@@ -1,6 +1,17 @@
 from flask import Flask, render_template, jsonify, request, send_file, send_from_directory
 from pydub import AudioSegment
 import os
+import requests
+
+
+def post_wav(wav_path):
+    # files = {
+    #     '"filename': open('audio.wav"', 'rb'),
+    # }
+
+    files = {'file': (wav_path, open('audio.wav', 'rb'))}
+
+    response = requests.post('http://18.132.153.117:5000/upload', files=files)
 
 app = Flask(__name__)
 app.static_folder = 'static'
@@ -19,9 +30,20 @@ def music_play():
     # ... your code here to select the music file ...
     # return the URL of the music file
     print("ask GPT")
-    os.system('curl -X POST -F \"file=@audio.wav\" http://18.132.153.117:5000/upload')
-    os.system('rm -rf ./audio.wav')
-    os.system('curl -OJ http://18.132.153.117:5000/download/audio.wav')
+    # os.system('curl -X POST -F \"file=@audio.wav\" http://18.132.153.117:5000/upload')
+    post_wav('audio.wav')
+    if os.path.exists('audio.wav'):
+        os.remove('audio.wav')
+    # os.system('rm -rf ./audio.wav')
+    # os.system('curl -OJ http://18.132.153.117:5000/download/audio.wav')
+
+    response = requests.get('http://18.132.153.117:5000/download/audio.wav')
+
+    music = response.content
+
+    with open(r'audio.wav', 'ab') as file:  # 保存到本地的文件名
+        file.write(response.content)
+        file.flush()
 
     # music_file_path = './audio.wav'
     # output_path = './audio.wav'
@@ -38,7 +60,9 @@ def music_play():
 
 @app.route('/record', methods=['POST'])
 def record():
-    os.system('rm -rf ./audio.wav')
+    # os.system('rm -rf ./audio.wav')
+    if os.path.exists('audio.wav'):
+        os.remove('audio.wav')
     audio_file = request.files['audio_data']
     file_path = 'recorded_audio.webm'
     audio_file.save(file_path)
