@@ -144,7 +144,7 @@ recordButton.onclick = function() {
                         recordButton.innerHTML = '<i class="fas fa-microphone"></i>'; // Change here
                         recordButton.classList.remove('recording'); // Remove the 'recording' class
                     }
-                }, 2000);  // 2 seconds of silence
+                }, 1500);  // 1.5 seconds of silence
             });
 
             speechEvents.on('speaking', function() {
