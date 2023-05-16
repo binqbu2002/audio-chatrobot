@@ -93,6 +93,7 @@
 <body>
     <h2>Intelligent Education Robot</h2>
     <div>
+
         <button id="recordButton"><i class="fas fa-microphone"></i></button>
         <button id="Stop All" onclick="document.location.reload()" class="stop-button"><i class="fas fa-power-off"></i></button>
     </div>
@@ -108,6 +109,12 @@
     <div class="audio-container">
         <audio id="musicPlayer" controls></audio>
     </div>
+
+
+</div>
+
+    <div id="timer" style="display: none">
+    GPT response latency: <span id="timeElapsed"></span> seconds
 </div>
 
 <script src="https://cdn.jsdelivr.net/gh/otalk/hark@latest/hark.bundle.js"></script>
@@ -123,6 +130,11 @@
     let lastTimeUpdate = 0;
     let stuckTimeout = null;
     const STUCK_TIMEOUT_MS = 2000;
+
+
+    let timerStart = null;
+let timeElapsedElement = document.getElementById('timeElapsed');
+let timerElement = document.getElementById('timer');
 
 recordButton.onclick = function() {
     if (!isRecording) {
@@ -152,6 +164,7 @@ recordButton.onclick = function() {
                 if (!hasStartedSpeaking) {
                     mediaRecorder.start();
                     hasStartedSpeaking = true;
+                    timerElement.style.display = 'none';
                     recordButton.innerHTML = '<i class="fas fa-stop"></i>';
                     recordButton.classList.add('recording'); // Remove the 'recording' class// Change here
                     //recordButton.textContent = 'Stop Recording';
@@ -164,6 +177,8 @@ recordButton.onclick = function() {
             };
 
             mediaRecorder.onstop = function() {
+
+                timerStart = Date.now();
                 let formData = new FormData();
                 let blob = new Blob(recordedChunks, {type: 'audio/webm'});
                 formData.append('audio_data', blob);
@@ -204,6 +219,14 @@ function fetchMusic() {
         const timestamp = new Date().getTime();
         question.style.display = 'none';
         musicPlayer.src = `/audio.wav?${timestamp}`;
+
+        musicPlayer.onplay = function() {
+            const timerEnd = Date.now();
+            const timeElapsed = (timerEnd - timerStart) / 1000;
+            timeElapsedElement.innerText = timeElapsed.toFixed(2);
+            timerElement.style.display = 'block';
+        }
+
         musicPlayer.play();
         answer.style.display = 'block';
     });
@@ -237,6 +260,8 @@ musicPlayer.ontimeupdate = function() {
 
     lastTimeUpdate = musicPlayer.currentTime;
 }
+
+
 
 </script>
 

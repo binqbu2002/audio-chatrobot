@@ -2,6 +2,7 @@ from flask import Flask, render_template, jsonify, request, send_file, send_from
 from pydub import AudioSegment
 import os
 import requests
+import time
 
 
 def post_wav(wav_path):
@@ -63,6 +64,7 @@ def record():
     # os.system('rm -rf ./audio.wav')
     if os.path.exists('audio.wav'):
         os.remove('audio.wav')
+    start = time.time()
     audio_file = request.files['audio_data']
     file_path = 'recorded_audio.webm'
     audio_file.save(file_path)
@@ -85,6 +87,9 @@ def record():
     # audio = audio.set_frame_rate(16000)
     # audio.export('audio.wav', format='wav')
     #
+    end = time.time()
+    print("the converting time is:")
+    print(end - start)
 
     return send_file(wav_file_path, as_attachment=True)
 
