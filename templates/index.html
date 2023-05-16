@@ -218,7 +218,7 @@ function fetchMusic() {
     }).then(data => {
         const timestamp = new Date().getTime();
         question.style.display = 'none';
-        musicPlayer.src = `/audio.wav?${timestamp}`;
+        musicPlayer.src = `/audio.mp3?${timestamp}`;
 
         musicPlayer.onplay = function() {
             const timerEnd = Date.now();
