@@ -162,6 +162,12 @@ recordButton.onclick = function() {
             speechEvents.on('speaking', function() {
                 clearTimeout(timeout);
                 if (!hasStartedSpeaking) {
+
+                    if (musicPlayer.playing) {
+                        musicPlayer.pause();
+
+                    }
+                    answer.style.display = 'none';
                     mediaRecorder.start();
                     hasStartedSpeaking = true;
                     timerElement.style.display = 'none';
@@ -195,6 +201,7 @@ recordButton.onclick = function() {
 
                     // Directly fetch the response after recording
                     fetchMusic();
+                    recordButton.click();
                 });
                 recordedChunks = [];
             };
@@ -235,7 +242,7 @@ function fetchMusic() {
 // Refresh the page after the music has finished playing
 musicPlayer.onended = function() {
     answer.style.display = 'none';
-    recordButton.click();
+    // recordButton.click();
 }
 
 // Refresh the page if an error occurs while playing the music
